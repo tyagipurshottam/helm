@@ -1,0 +1,211 @@
+########################## Helm interview Questtion/Course ##############################
+
+helm use .kube/config file to undergo kubernetest cluster for deployment(dur to this it conatin admin access we can create specal hel assec also by RBAC)
+
+helm v2 vs helm3, we use helm 3
+-helm2 use triiler service which is install in kube8 in default/sepefic namespcae
+- helm3 get access through RBAC
+-helm2 talk to triller, then triller talk to kubeapi in helm3 there is no triller and helm3 directly talk to kubeapi
+
+
+install helm3
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+chmod 700 get_helm.sh
+./get_helm.sh (helm 3 install kub8 file will be in .kube/config)
+
+#add repo in helm
+helm  repo add stable https://charts.helm.sh/stable
+
+#list of repo
+helm  repo list
+
+#install repo for something
+helm install tygai-airflow stable/airflow
+
+#remove/unistall/delete repo
+helm delete tygai-airflow
+
+#all helm list
+helm ls --all-namespaces
+
+#create own charts
+helm create mychart
+
+#work on own charts
+cd mychart/
+rm -rf templates/*
+cd templates/
+vi configmap.yaml
+cd ~
+helm install --debug --dry-run my-configmap ./mychart(to dry run)
+helm install my-configmap ./mychart(install)
+helm describe my-configmap
+helm delete my-configmap
+
+#put value in values file 
+ mychart/values.yaml
+ costCode: CC98112
+ 
+ configmap.yaml
+ 
+ costCode: {{ .Values.costCode }} 
+ helm install --debug --dry-run firstdryrun ./mychart
+ 
+ helm install firstvalue ./mychart
+ 
+ helm get manifest firstvalue
+ 
+ kubectl describe configmaps firstvalue-configmap
+ costCode=sdftt
+helm install --debug --dry-run valuestag ./mychart --set=costCode=uuuii8899 (change config value in run time env)
+helm install  valuestag ./mychart --set=costCode=uuuii8899
+
+#template function 
+ https://masterminds.github.io/sprig/
+ 
+ https://godoc.org/text/template
+ 
+ projectCode: aazzxxyy
+ infra:
+   zone: a,b,c
+   region: us-e
+
+ Zone: {{ quote .Values.infra.zone }}
+ Region: {{ quote .Values.infra.region }}
+ ProjectCode: {{ upper .Values.projectCode }}
+
+#pipeline
+ ~~~~~~ 
+ in configmap.yaml file
+  pipeline: {{ .Values.projectCode | upper | quote }}
+  now: {{ now | date "2006-01-02" | quote }}(there is bug you always put these date then you get correct date)
+
+  helm install --dry-run --debug valueseteg ./mychart
+  ~~~~~~~~~~~~~~~~~~~~~~~``
+  default value
+  contact: {{ .Values.contact | default "1-800-123-0000" | quote }}
+  
+  helm install --dry-run --debug valueseteg ./mychart  
+  helm install --dry-run --debug --set contact=1-800-800-8888 valueseteg ./mychart
+
+
+#if else condion in configmap.yaml file
+ {{ if eq .Values.infra.region "us-e" }}ha: true{{ end }}
+ or
+  {{- if eq .Values.infra.region "us-east" }}
+  ha: true
+  {{- end }}
+
+#define scope using with
+vi mychart/values.yaml
+ tags:
+   machine: frontdrive
+   rack: 4c
+   drive: ssd
+   vcard: 8g
+   
+vi mycahrt/template/configmap.yaml
+   {{- with .Values.tags }}
+   Machine Type: {{ .machine | default "NA" | quote }}
+   Rack ID: {{ .rack | quote }}
+   Storage Type: {{ .drive | upper | quote }}
+   Video Card: {{ .vcard | quote }}
+   {{- end }}
+
+
+#Range
+vi mychart/values.yaml
+  LangUsed:
+    - Python
+    - Ruby
+    - Java
+    - Scala
+vi mychart/templates/configmap.yaml    
+  LangUsed: |-
+     {{- range .Values.LangUsed }}
+     - {{ . | title | quote }}
+     {{- end }}        
+ title - Title case functions
+ helm install --dry-run --debug controlif ./mychart
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   NetSpeed: |-
+     {{- range tuple "low" "medium" "high" }}
+     - {{ . }}
+     {{- end }}
+ helm install --dry-run --debug controlif ./mychart
+
+#Variable
+{{- fornt and end -}} it means it line not print in configmap or we can use as comment line :)
+1.vi mychart/templates/configmap.yaml
+ {{- $relname := .Release.Name -}}
+ {{- with .Values.tags }}
+ Machine Type: {{ .machine | default "NA" | quote }}
+ Rack ID: {{ .rack | quote }}
+ Storage Type: {{ .drive | upper | quote }}
+ Video Card: {{ .vcard | quote }}
+ Release: {{ $relname }}
+ {{- end }}
+2.vi  mychart/values.yaml
+  LangUsed:
+  - Python
+  - Ruby
+  
+  vi mychart/templates/configmap.yaml
+  LangUsed: |-
+    {{- range $index, $topping := .Values.LangUsed }}
+    - {{ $index }} : {{ $topping }}
+    {{- end }}
+   helm install --debug --dry-run   myvalueqwee ./mychart
+   output
+    LangUsed: |-
+    - 0 : Python
+    - 1 : Ruby
+3.vi mychart/templates/configmap.yaml
+ labels:
+   helm.sh/chart: "{{ $.Chart.Name }}-{{ $.Chart.Version }}"
+   app.kubernetes.io/instance: "{{ $.Release.Name }}"
+   app.kubernetes.io/version: "{{ $.Chart.AppVersion }}"
+   app.kubernetes.io/managed-by: "{{ $.Release.Service }}"
+
+  output
+    helm.sh/chart: "mychart-0.1.0"
+    app.kubernetes.io/instance: "myvalueqwee"
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: "Helm"
+
+
+#include content file with same file
+{{- define "mychart.systemlables" }}
+  labels:
+    drive: ssd
+    machine: frontdrive
+    rack: 4c
+    vcard: 8g
+{{- end }} #1 libe gap then apiversion: v1 and then add labels in it
+
+  labels:
+  {{- template "mychart.systemlables" }}
+
+#include template content in another file
+vi mychart/templates/_helper.tpl
+{{- define "mychart.systemlables" }}
+  labels:
+    drive: ssd
+    machine: frontdrive
+    rack: 4c
+    vcard: 8g
+{{- end }}
+
+2.vi mychart/templates/_helper.tpl
+   app.kubernetes.io/instance: "{{ $.Release.Name }}"
+   app.kubernetes.io/version: "{{ $.Chart.AppVersion }}"
+   app.kubernetes.io/managed-by: "{{ $.Release.Service }}"
+   
+   vi  mychart/templates/configmap.yaml
+   {{- template "mychart.systemlables" . }}   
+   {{- template "mychart.systemlables" $ }}
+  
+helm install --dry-run --debug templatedemo ./mychart
+
+
+
